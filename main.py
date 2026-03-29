@@ -203,11 +203,16 @@ def webhook_lark():
 
             if response_text:
                 sender_id = event_data["sender"].get("sender_id", {}).get("open_id", "")
-                if chat_id.startswith("oc_"):
-                    lark_client.send_text(chat_id, response_text)
+                # Ưu tiên chat_id (nhóm / P2P đều có); lark_client tự chọn receive_id_type (oc_=chat_id, ou_=open_id)
+                target = chat_id or sender_id
+                if target:
+                    ok = lark_client.send_text(target, response_text)
+                    if not ok:
+                        logger.error(f"Gửi tin nhắn thất bại, target={target}")
+                    else:
+                        logger.info(f"Đã gửi phản hồi đến {target}")
                 else:
-                    lark_client.send_text(sender_id, response_text)
-                logger.info(f"Đã gửi phản hồi đến {sender_id}")
+                    logger.error("Không có chat_id/sender_id để gửi phản hồi")
 
             return jsonify({"code": 0, "msg": "success"})
 

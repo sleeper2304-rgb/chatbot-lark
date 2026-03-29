@@ -66,11 +66,17 @@ class LarkClient:
             "Content-Type": "application/json"
         }
 
-        # Xác định receive_id_type dựa trên format
-        if "@" in receive_id or receive_id.startswith("oc_"):
+        # receive_id_type theo tài liệu Lark:
+        # oc_* = chat (nhóm / cuộc trò chuyện) -> chat_id
+        # ou_* = user open_id -> open_id
+        if receive_id.startswith("oc_"):
+            receive_id_type = "chat_id"
+        elif receive_id.startswith("ou_"):
             receive_id_type = "open_id"
         elif receive_id.isdigit():
             receive_id_type = "user_id"
+        elif "@" in receive_id:
+            receive_id_type = "open_id"
         else:
             receive_id_type = "chat_id"
 

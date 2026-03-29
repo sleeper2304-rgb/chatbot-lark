@@ -46,13 +46,25 @@ class ChatBot:
     def process_message(self, event: Dict) -> Optional[str]:
         """Xử lý tin nhắn từ Lark"""
         try:
-            # Parse event
+            # Parse event (Lark có thể gửi content là chuỗi JSON hoặc dict)
             msg_type = event.get("msg_type", "")
-            content = json.loads(event.get("content", "{}"))
+            raw_content = event.get("content", "{}")
+            if isinstance(raw_content, dict):
+                content = raw_content
+            elif isinstance(raw_content, str):
+                try:
+                    content = json.loads(raw_content) if raw_content.strip() else {}
+                except json.JSONDecodeError:
+                    content = {"text": raw_content}
+            else:
+                content = {}
             sender_id = event.get("sender", {}).get("sender_id", {}).get("open_id", "")
             chat_id = event.get("chat_id", "")
             message_id = event.get("message_id", "")
             text = content.get("text", "").strip()
+            # Bỏ thẻ @bot trong nội dung Lark: <at user_id="..."></at>
+            text = re.sub(r"<at[^>]*>.*?</at>", "", text, flags=re.DOTALL).strip()
+            text = re.sub(r"<at[^>]*/>", "", text).strip()
 
             self.stats["total_messages"] += 1
 
