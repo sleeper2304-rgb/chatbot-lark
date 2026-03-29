@@ -26,5 +26,3 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Railway
-railway.json

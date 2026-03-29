@@ -21,3 +21,6 @@ schedule==1.2.1
 
 # Utilities
 pytz==2024.1
+
+# Lark webhook giải mã (Encrypt Key)
+pycryptodome==3.21.0

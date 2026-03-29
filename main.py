@@ -98,6 +98,53 @@ def stats():
     })
 
 
+def _parse_lark_webhook_payload():
+    """
+    Parse JSON; nếu Lark bật Encrypt Key thì body là {"encrypt": "..."} — cần giải mã.
+    """
+    payload = request.get_json(force=True, silent=True)
+    if payload is None:
+        try:
+            raw = request.get_data(as_text=True) or ""
+            if raw.strip():
+                payload = json.loads(raw)
+            else:
+                payload = {}
+        except json.JSONDecodeError:
+            payload = {}
+
+    if not isinstance(payload, dict):
+        return {}
+
+    if "encrypt" in payload:
+        key = (config.LARK_ENCRYPT_KEY or "").strip()
+        if not key:
+            logger.error("Lark gửi payload mã hóa nhưng LARK_ENCRYPT_KEY chưa cấu hình trên server")
+            raise ValueError("Thiếu LARK_ENCRYPT_KEY (Railway Variables phải trùng Encrypt Key trên Lark)")
+        from modules.lark_crypto import decrypt_lark_body
+
+        plain = decrypt_lark_body(payload["encrypt"], key)
+        return json.loads(plain)
+
+    return payload
+
+
+def _lark_event_type_and_body(payload: dict):
+    """Hỗ trợ schema 2.0 và event_callback v1."""
+    if payload.get("schema") == "2.0":
+        h = payload.get("header") or {}
+        return h.get("event_type", ""), payload.get("event") or {}, h.get("token", "")
+
+    if payload.get("type") == "event_callback":
+        ev = payload.get("event") or {}
+        et = ev.get("type") or ev.get("event_type", "")
+        return et, ev, payload.get("token", "")
+
+    ev = payload.get("event") or {}
+    et = ev.get("event_type") or ev.get("type", "")
+    return et, ev, payload.get("token", "")
+
+
 @app.route(config.WEBHOOK_PATH, methods=['POST'])
 def webhook_lark():
     """
@@ -105,75 +152,70 @@ def webhook_lark():
     Lark sẽ POST event vào endpoint này
     """
     try:
-        # Parse request
-        payload = request.get_json()
-        logger.info(f"Nhận webhook: {json.dumps(payload, ensure_ascii=False)[:500]}")
+        payload = _parse_lark_webhook_payload()
+        logger.info(f"Webhook (sau parse): {json.dumps(payload, ensure_ascii=False)[:800]}")
 
-        # Xử lý URL verification (Lark gửi challenge để verify)
+        # URL verification — có thể là JSON thường hoặc đã giải mã từ encrypt
         if payload.get("type") == "url_verification":
+            token = payload.get("token", "")
+            if config.LARK_VERIFICATION_TOKEN and token != config.LARK_VERIFICATION_TOKEN:
+                logger.warning("url_verification: token không khớp LARK_VERIFICATION_TOKEN")
+                return jsonify({"code": 403, "msg": "invalid token"}), 403
             challenge = payload.get("challenge", "")
-            logger.info(f"URL Verification - Challenge: {challenge}")
+            logger.info("URL verification OK, tra challenge")
             return jsonify({"challenge": challenge})
 
-        # Xử lý event tin nhắn
-        if "event" in payload:
-            event = payload["event"]
+        event_type, event, evt_token = _lark_event_type_and_body(payload)
 
-            # Lọc theo event type
-            event_type = event.get("event_type", "")
+        if config.LARK_VERIFICATION_TOKEN and evt_token and evt_token != config.LARK_VERIFICATION_TOKEN:
+            logger.warning("event: token không khớp LARK_VERIFICATION_TOKEN")
+            return jsonify({"code": 403, "msg": "invalid token"}), 403
 
-            if event_type == "im.message.receive_v1":
-                # Tin nhắn mới
-                message = event.get("message", {})
+        if event_type == "im.message.receive_v1":
+            message = event.get("message", {})
 
-                # Bỏ qua một số loại tin nhắn
-                msg_type = message.get("msg_type", "")
-                if msg_type in ["post", "audio", "video", "file", "sticker"]:
-                    logger.info(f"Bỏ qua tin nhắn type: {msg_type}")
-                    return jsonify({"code": 0, "msg": "ignored"})
+            msg_type = message.get("msg_type", "")
+            if msg_type in ["post", "audio", "video", "file", "sticker"]:
+                logger.info(f"Bỏ qua tin nhắn type: {msg_type}")
+                return jsonify({"code": 0, "msg": "ignored"})
 
-                # Parse nội dung tin nhắn
-                content = message.get("content", "{}")
-                try:
-                    content = json.loads(content)
-                except:
-                    content = {"text": content}
+            content = message.get("content", "{}")
+            try:
+                content = json.loads(content) if isinstance(content, str) else (content or {})
+            except json.JSONDecodeError:
+                content = {"text": str(content)}
 
-                event_data = {
-                    "msg_type": msg_type,
-                    "content": content,
-                    "message_id": message.get("message_id", ""),
-                    "chat_id": message.get("chat_id", ""),
-                    "sender": event.get("sender", {}),
-                    "create_time": message.get("create_time", ""),
-                }
+            event_data = {
+                "msg_type": msg_type,
+                "content": content,
+                "message_id": message.get("message_id", ""),
+                "chat_id": message.get("chat_id", ""),
+                "sender": event.get("sender", {}),
+                "create_time": message.get("create_time", ""),
+            }
 
-                # Kiểm tra quyền truy cập
-                chat_id = event_data["chat_id"]
-                if config.ALLOWED_CHAT_IDS and chat_id not in config.ALLOWED_CHAT_IDS:
-                    logger.info(f"Bỏ qua tin nhắn từ chat không được phép: {chat_id}")
-                    return jsonify({"code": 0, "msg": "chat not allowed"})
+            chat_id = event_data["chat_id"]
+            if config.ALLOWED_CHAT_IDS and chat_id not in config.ALLOWED_CHAT_IDS:
+                logger.info(f"Bỏ qua chat không được phép: {chat_id}")
+                return jsonify({"code": 0, "msg": "chat not allowed"})
 
-                # Xử lý tin nhắn bằng chatbot
-                response_text = chatbot.process_message(event_data)
+            response_text = chatbot.process_message(event_data)
 
-                if response_text:
-                    # Gửi phản hồi về Lark
-                    sender_id = event_data["sender"].get("sender_id", {}).get("open_id", "")
+            if response_text:
+                sender_id = event_data["sender"].get("sender_id", {}).get("open_id", "")
+                if chat_id.startswith("oc_"):
+                    lark_client.send_text(chat_id, response_text)
+                else:
+                    lark_client.send_text(sender_id, response_text)
+                logger.info(f"Đã gửi phản hồi đến {sender_id}")
 
-                    # Nếu là chat nhóm, gửi vào chat
-                    if chat_id.startswith("oc_"):
-                        lark_client.send_text(chat_id, response_text)
-                    else:
-                        # Chat riêng - reply vào message
-                        lark_client.send_text(sender_id, response_text)
-
-                    logger.info(f"Đã gửi phản hồi đến {sender_id}")
-
-                return jsonify({"code": 0, "msg": "success"})
+            return jsonify({"code": 0, "msg": "success"})
 
         return jsonify({"code": 0, "msg": "event processed"})
 
+    except ValueError as e:
+        logger.error(str(e))
+        return jsonify({"code": 500, "msg": str(e)}), 500
     except Exception as e:
         logger.error(f"Lỗi xử lý webhook: {e}", exc_info=True)
         return jsonify({"code": 500, "msg": str(e)}), 500
