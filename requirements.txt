@@ -1,0 +1,23 @@
+# ============================================
+# REQUIREMENTS - THƯ VIỆN CẦN THIẾT
+# Miễn phí 100%
+# ============================================
+
+# Web framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Kết nối Lark API
+requests==2.31.0
+
+# AI - Gemini (Miễn phí!)
+google-generativeai==0.8.5
+
+# Cấu hình môi trường
+python-dotenv==1.0.0
+
+# Scheduler cho workflow tự động
+schedule==1.2.1
+
+# Utilities
+pytz==2024.1
