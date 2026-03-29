@@ -1,6 +1,6 @@
 # ============================================
 # CẤU HÌNH CHÍNH - CHATBOT AI LARK
-# Miễn phí 100% - Gemini AI + Lark API
+# Miễn phí 100% - Groq AI + Lark API
 # ============================================
 
 import os
@@ -14,10 +14,10 @@ LARK_APP_SECRET = os.getenv("LARK_APP_SECRET", "")
 LARK_VERIFICATION_TOKEN = os.getenv("LARK_VERIFICATION_TOKEN", "")
 LARK_ENCRYPT_KEY = os.getenv("LARK_ENCRYPT_KEY", "")
 
-# === GEMINI AI (MIỄN PHÍ) ===
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.7"))
+# === GROQ AI (MIỄN PHÍ - NHANH) ===
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_TEMPERATURE = float(os.getenv("GROQ_TEMPERATURE", "0.7"))
 
 # === FLASK CONFIG ===
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"

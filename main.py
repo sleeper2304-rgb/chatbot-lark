@@ -1,6 +1,6 @@
 # ============================================
 # FILE KHOI CHAY CHINH - CHATBOT AI LARK
-# Mien phi 100% - Gemini AI + Lark API
+# Mien phi 100% - Groq AI + Lark API
 # ============================================
 
 import os
@@ -21,7 +21,7 @@ if sys.platform == 'win32':
 
 import config
 from modules.lark_client import lark_client
-from modules.gemini_ai import gemini_ai
+from modules.groq_ai import groq_ai
 from modules.chatbot import chatbot
 from modules.workflow import workflow_engine
 
@@ -59,11 +59,11 @@ def index():
         "version": "1.0.0",
         "status": "online",
         "bot_name": config.BOT_NAME,
-        "ai_model": config.GEMINI_MODEL if gemini_ai.is_available() else "Not configured",
+        "ai_model": config.GROQ_MODEL if groq_ai.is_available() else "Not configured",
         "features": [
             "Chatbot trả lời tự động",
             "Workflow tự động hóa",
-            "AI thông minh (Gemini - miễn phí)"
+            "AI thông minh (Groq - miễn phí, nhanh)"
         ],
         "endpoints": {
             "webhook": config.WEBHOOK_PATH,
@@ -82,7 +82,7 @@ def health():
         "timestamp": datetime.now().isoformat(),
         "services": {
             "lark_api": "connected" if config.LARK_APP_ID else "not_configured",
-            "gemini_ai": "online" if gemini_ai.is_available() else "offline",
+            "groq_ai": "online" if groq_ai.is_available() else "offline",
             "workflow": "running" if workflow_engine._running else "stopped"
         }
     })
@@ -93,7 +93,7 @@ def stats():
     """Thống kê bot"""
     return jsonify({
         "bot_stats": chatbot.stats,
-        "ai_conversations": gemini_ai.get_conversation_count(),
+        "ai_conversations": groq_ai.get_conversation_count(),
         "schedules": len(workflow_engine.schedules),
         "reminders": len(workflow_engine.reminders),
         "uptime": str(datetime.now() - chatbot.stats["start_time"])
@@ -349,7 +349,7 @@ def print_banner():
 |                                                                |
 |     CHATBOT AI LARK - MIEN PHI 100%                           |
 |                                                                |
-|     * Gemini AI (Free Tier)                                   |
+|     * Groq AI (Free Tier - Nhanh!)                            |
 |     * Chat tu dong tren Lark                                   |
 |     * Workflow tu dong hoa                                    |
 |                                                                |
@@ -357,7 +357,7 @@ def print_banner():
 
 [*] Cau hinh:
    - Bot Name: {config.BOT_NAME}
-   - AI Model: {config.GEMINI_MODEL}
+   - AI Model: {config.GROQ_MODEL}
    - Port: {config.PORT}
    - Debug: {config.DEBUG}
 
@@ -378,8 +378,8 @@ def verify_config():
     if not config.LARK_APP_ID or not config.LARK_APP_SECRET:
         errors.append("! Chua cau hinh LARK_APP_ID va LARK_APP_SECRET")
 
-    if not config.GEMINI_API_KEY:
-        errors.append("! Chua cau hinh GEMINI_API_KEY (AI se khong hoat dong)")
+    if not config.GROQ_API_KEY:
+        errors.append("! Chua cau hinh GROQ_API_KEY (AI se khong hoat dong)")
 
     if errors:
         print("\n".join(errors))

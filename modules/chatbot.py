@@ -9,7 +9,7 @@ import re
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import config
-from modules.gemini_ai import gemini_ai
+from modules.groq_ai import groq_ai
 from modules.lark_client import lark_client
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class ChatBot:
     }
 
     def __init__(self):
-        self.ai = gemini_ai
+        self.ai = groq_ai
         self.lark = lark_client
         self.stats = {
             "total_messages": 0,
@@ -281,7 +281,7 @@ class ChatBot:
         report_text += f"• Commands used: {self.stats['commands_used']}\n\n"
 
         report_text += "**✅ Hệ thống:**\n"
-        report_text += f"• Gemini AI: {'🟢 Online' if self.ai.is_available() else '🔴 Offline'}\n"
+        report_text += f"• Groq AI: {'🟢 Online' if self.ai.is_available() else '🔴 Offline'}\n"
         report_text += f"• Lark API: 🟢 Connected"
 
         return report_text

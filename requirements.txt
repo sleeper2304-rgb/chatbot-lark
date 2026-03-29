@@ -10,8 +10,8 @@ Werkzeug==3.0.1
 # Kết nối Lark API
 requests==2.31.0
 
-# AI - Gemini (Miễn phí!)
-google-generativeai==0.8.5
+# AI - Groq (Miễn phí - Nhanh!)
+openai>=1.12.0
 
 # Cấu hình môi trường
 python-dotenv==1.0.0
