@@ -1044,12 +1044,11 @@ class ChatBot:
                 },
                 {"tag": "hr"},
                 {
-                    "tag": "div",
-                    "elements": [
+                    "tag": "action",
+                    "actions": [
                         {"tag": "button", "text": {"tag": "plain_text", "content": "✅ Sẽ tham gia"}, "type": "primary", "value": {"action": "meeting_join"}},
                         {"tag": "button", "text": {"tag": "plain_text", "content": "❌ Không tham gia"}, "type": "default", "value": {"action": "meeting_decline"}}
-                    ],
-                    "layout": "right"
+                    ]
                 },
                 {"tag": "hr"},
                 {

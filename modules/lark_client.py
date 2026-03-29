@@ -199,7 +199,7 @@ class LarkClient:
                            buttons: List[Dict] = None, header_color: str = "blue") -> bool:
         """
         Tạo card với buttons có thể tương tác
-        
+
         Args:
             receive_id: ID người nhận
             title: Tiêu đề
@@ -227,12 +227,15 @@ class LarkClient:
             btn_elements = []
             for btn in buttons:
                 btn_elements.append({
-                    "tag": "button",
-                    "text": {"tag": "plain_text", "content": btn.get("text", "Button")},
-                    "type": btn.get("type", "primary"),
-                    "value": {"action": btn.get("value", "")}
+                    "tag": "action",
+                    "actions": [{
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": btn.get("text", "Button")},
+                        "type": btn.get("type", "primary"),
+                        "value": {"action": btn.get("value", "")}
+                    }]
                 })
-            card["elements"].append({"tag": "div", "elements": btn_elements, "layout": "right"})
+            card["elements"].extend(btn_elements)
 
         card["elements"].append({
             "tag": "note",

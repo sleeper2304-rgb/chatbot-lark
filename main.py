@@ -181,6 +181,129 @@ def _lark_reply_worker(event_data: dict):
         logger.error(f"Background reply lỗi: {e}", exc_info=True)
 
 
+def _handle_card_callback(event: dict, base_event_data: dict):
+    """
+    Xử lý sự kiện khi người dùng click vào nút trong card (Lark Interactive Card)
+    """
+    try:
+        message = event.get("message", {})
+        content = message.get("content", "{}")
+        try:
+            content = json.loads(content) if isinstance(content, str) else content
+        except:
+            content = {}
+
+        # Lấy thông tin từ callback
+        action_value = content.get("action_value", {})
+        if isinstance(action_value, str):
+            try:
+                action_value = json.loads(action_value)
+            except:
+                action_value = {"action": action_value}
+
+        action = action_value.get("action", "")
+        sender = event.get("sender", {})
+        sender_id = sender.get("sender_id", {}).get("open_id", "")
+        sender_name = sender.get("sender_id", {}).get("name", sender_id)
+        chat_id = message.get("chat_id", "")
+        message_id = message.get("message_id", "")
+
+        logger.info(f"Card callback: action={action}, sender={sender_id}")
+
+        # Xử lý các action từ button
+        response_text = ""
+
+        # Task actions
+        if action.startswith("donetask_"):
+            task_id = action.replace("donetask_", "")
+            if chatbot._cmd_donetask(task_id, chat_id):
+                response_text = f"✅ Task `{task_id}` đã được đánh dấu hoàn thành!"
+            else:
+                response_text = f"❌ Không tìm thấy task `{task_id}`"
+
+        elif action.startswith("deltask_"):
+            task_id = action.replace("deltask_", "")
+            if chatbot._cmd_deltask(task_id, chat_id):
+                response_text = f"🗑️ Task `{task_id}` đã được xóa!"
+            else:
+                response_text = f"❌ Không tìm thấy task `{task_id}`"
+
+        # Meeting actions
+        elif action == "meeting_join":
+            response_text = f"✅ {sender_name} sẽ tham gia cuộc họp!"
+
+        elif action == "meeting_decline":
+            response_text = f"👋 {sender_name} không thể tham gia cuộc họp."
+
+        # Menu actions
+        elif action == "view_more":
+            response_text = chatbot._cmd_help()
+
+        elif action in ["chat", "ask"]:
+            response_text = "💬 Gõ câu hỏi để trò chuyện với AI! Ví dụ: `/ask Tại sao bầu trời xanh?`"
+
+        elif action == "task":
+            response_text = chatbot._cmd_tasks("", chat_id)
+
+        elif action == "remind":
+            response_text = chatbot._cmd_remind("", sender_id, chat_id)
+
+        elif action == "checkin":
+            response_text = chatbot._cmd_checkin(sender_id, sender_name, chat_id)
+
+        elif action == "meeting":
+            response_text = chatbot._cmd_meeting("", chat_id)
+
+        elif action == "note":
+            response_text = "📝 Gõ `/note [nội dung]` để lưu ghi chú nhanh!\n\nVí dụ: `/note Họp team lúc 3h`"
+
+        elif action == "vote":
+            response_text = chatbot._cmd_vote("", chat_id)
+
+        elif action == "notify":
+            response_text = chatbot._cmd_notify("", chat_id)
+
+        elif action == "keyword":
+            response_text = chatbot._cmd_keyword("", chat_id)
+
+        elif action == "table":
+            response_text = chatbot._cmd_table("", chat_id)
+
+        elif action == "stats":
+            response_text = chatbot._cmd_stats()
+
+        elif action == "clear":
+            response_text = chatbot._cmd_clear(chat_id)
+
+        elif action == "submit_form":
+            response_text = f"✅ {sender_name} đã gửi form!"
+
+        elif action == "cancel":
+            response_text = f"❌ {sender_name} đã hủy."
+
+        elif action == "confirm":
+            response_text = f"✅ {sender_name} đã xác nhận!"
+
+        else:
+            response_text = f"🔔 Cảm ơn {sender_name}! Action: `{action}`\n\n(Bot đang phát triển thêm tính năng này)"
+            logger.info(f"Unknown card action: {action}")
+
+        # Gửi phản hồi
+        if response_text and response_text != "None":
+            if message_id:
+                lark_client.reply_message(message_id, "text", {"text": response_text})
+            else:
+                lark_client.send_text(chat_id, response_text)
+
+        return jsonify({"code": 0, "msg": "card callback processed"})
+
+    except Exception as e:
+        logger.error(f"Lỗi xử lý card callback: {e}", exc_info=True)
+        return jsonify({"code": 500, "msg": str(e)}), 500
+
+    return jsonify({"code": 0, "msg": "card callback processed"})
+
+
 @app.route(config.WEBHOOK_PATH, methods=['POST'])
 def webhook_lark():
     """
@@ -221,6 +344,11 @@ def webhook_lark():
                 content = json.loads(content) if isinstance(content, str) else (content or {})
             except json.JSONDecodeError:
                 content = {"text": str(content)}
+
+            # Kiểm tra xem có phải là callback từ card button không
+            # Lark gửi msg_type = "interactive" khi user click button
+            if msg_kind == "interactive":
+                return _handle_card_callback(event, event_data)
 
             event_data = {
                 "msg_type": msg_kind,
