@@ -6,9 +6,11 @@
 import os
 import sys
 import io
+import copy
 import logging
 import json
 import codecs
+import threading
 from datetime import datetime
 from flask import Flask, request, jsonify
 
@@ -145,6 +147,30 @@ def _lark_event_type_and_body(payload: dict):
     return et, ev, payload.get("token", "")
 
 
+def _lark_reply_worker(event_data: dict):
+    """
+    Lark yêu cầu HTTP 200 trong ~3 giây; Gemini thường chậm hơn.
+    Xử lý trả lời ở background để webhook trả về ngay.
+    """
+    try:
+        response_text = chatbot.process_message(event_data)
+        if not response_text:
+            return
+        sender_id = (event_data.get("sender") or {}).get("sender_id", {}).get("open_id", "")
+        chat_id = event_data.get("chat_id", "") or ""
+        target = chat_id or sender_id
+        if not target:
+            logger.error("Background: không có chat_id/sender_id")
+            return
+        ok = lark_client.send_text(target, response_text)
+        if not ok:
+            logger.error(f"Background: gửi tin thất bại, target={target}")
+        else:
+            logger.info(f"Background: đã gửi phản hồi tới {target}")
+    except Exception as e:
+        logger.error(f"Background reply lỗi: {e}", exc_info=True)
+
+
 @app.route(config.WEBHOOK_PATH, methods=['POST'])
 def webhook_lark():
     """
@@ -199,22 +225,13 @@ def webhook_lark():
                 logger.info(f"Bỏ qua chat không được phép: {chat_id}")
                 return jsonify({"code": 0, "msg": "chat not allowed"})
 
-            response_text = chatbot.process_message(event_data)
+            # Trả 200 ngay cho Lark (timeout ~3s); Gemini + gửi tin chạy nền
+            work = copy.deepcopy(event_data)
+            threading.Thread(target=_lark_reply_worker, args=(work,), daemon=True).start()
+            return jsonify({"code": 0, "msg": "accepted"})
 
-            if response_text:
-                sender_id = event_data["sender"].get("sender_id", {}).get("open_id", "")
-                # Ưu tiên chat_id (nhóm / P2P đều có); lark_client tự chọn receive_id_type (oc_=chat_id, ou_=open_id)
-                target = chat_id or sender_id
-                if target:
-                    ok = lark_client.send_text(target, response_text)
-                    if not ok:
-                        logger.error(f"Gửi tin nhắn thất bại, target={target}")
-                    else:
-                        logger.info(f"Đã gửi phản hồi đến {target}")
-                else:
-                    logger.error("Không có chat_id/sender_id để gửi phản hồi")
-
-            return jsonify({"code": 0, "msg": "success"})
+        if event_type:
+            logger.info(f"Webhook: bỏ qua event_type={event_type!r}")
 
         return jsonify({"code": 0, "msg": "event processed"})
 
