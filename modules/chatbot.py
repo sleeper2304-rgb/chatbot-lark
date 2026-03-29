@@ -46,8 +46,8 @@ class ChatBot:
     def process_message(self, event: Dict) -> Optional[str]:
         """Xử lý tin nhắn từ Lark"""
         try:
-            # Parse event (Lark có thể gửi content là chuỗi JSON hoặc dict)
-            msg_type = event.get("msg_type", "")
+            # Parse event (v2.0: message_type; cũ: msg_type)
+            msg_type = (event.get("msg_type") or event.get("message_type") or "").strip()
             raw_content = event.get("content", "{}")
             if isinstance(raw_content, dict):
                 content = raw_content
@@ -65,11 +65,17 @@ class ChatBot:
             # Bỏ thẻ @bot trong nội dung Lark: <at user_id="..."></at>
             text = re.sub(r"<at[^>]*>.*?</at>", "", text, flags=re.DOTALL).strip()
             text = re.sub(r"<at[^>]*/>", "", text).strip()
+            # Feishu v2 mention trong text: @_user_1
+            text = re.sub(r"@_user_\d+\s*", "", text).strip()
 
             self.stats["total_messages"] += 1
 
             # Bỏ qua tin nhắn từ bot
             if event.get("sender", {}).get("sender_type") == "bot":
+                return None
+
+            if not text:
+                logger.info("Nội dung text rỗng sau khi parse, bỏ qua")
                 return None
 
             # Xử lý lệnh đặc biệt

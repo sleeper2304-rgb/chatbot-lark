@@ -155,7 +155,17 @@ def _lark_reply_worker(event_data: dict):
     try:
         response_text = chatbot.process_message(event_data)
         if not response_text:
+            logger.info("Background: process_message trả về rỗng (bỏ qua hoặc không có nội dung)")
             return
+        message_id = (event_data.get("message_id") or "").strip()
+        # Ưu tiên reply theo message_id (đúng chuẩn bot Feishu v2)
+        if message_id:
+            ok = lark_client.reply_message(message_id, "text", {"text": response_text})
+            if ok:
+                logger.info(f"Background: đã reply message_id={message_id}")
+                return
+            logger.warning("Background: reply_message thất bại, thử send_text")
+
         sender_id = (event_data.get("sender") or {}).get("sender_id", {}).get("open_id", "")
         chat_id = event_data.get("chat_id", "") or ""
         target = chat_id or sender_id
@@ -200,9 +210,10 @@ def webhook_lark():
         if event_type == "im.message.receive_v1":
             message = event.get("message", {})
 
-            msg_type = message.get("msg_type", "")
-            if msg_type in ["post", "audio", "video", "file", "sticker"]:
-                logger.info(f"Bỏ qua tin nhắn type: {msg_type}")
+            # Feishu v2.0 dùng message_type; bản cũ dùng msg_type
+            msg_kind = (message.get("msg_type") or message.get("message_type") or "").strip()
+            if msg_kind in ["post", "audio", "video", "file", "sticker"]:
+                logger.info(f"Bỏ qua tin nhắn type: {msg_kind}")
                 return jsonify({"code": 0, "msg": "ignored"})
 
             content = message.get("content", "{}")
@@ -212,7 +223,7 @@ def webhook_lark():
                 content = {"text": str(content)}
 
             event_data = {
-                "msg_type": msg_type,
+                "msg_type": msg_kind,
                 "content": content,
                 "message_id": message.get("message_id", ""),
                 "chat_id": message.get("chat_id", ""),

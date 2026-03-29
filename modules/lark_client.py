@@ -97,9 +97,10 @@ class LarkClient:
             if data.get("code") == 0:
                 logger.info(f"Gửi tin nhắn thành công đến {receive_id}")
                 return True
-            else:
-                logger.error(f"Lỗi gửi tin nhắn: {data}")
-                return False
+            logger.error(
+                f"Lỗi gửi tin nhắn receive_id_type={receive_id_type} id={receive_id}: {data}"
+            )
+            return False
 
         except Exception as e:
             logger.error(f"Lỗi gửi tin nhắn: {e}")
@@ -158,7 +159,10 @@ class LarkClient:
         try:
             response = requests.post(url, headers=headers, json=payload, timeout=10)
             data = response.json()
-            return data.get("code") == 0
+            if data.get("code") == 0:
+                return True
+            logger.error(f"Lỗi reply message_id={message_id}: {data}")
+            return False
         except Exception as e:
             logger.error(f"Lỗi reply tin nhắn: {e}")
             return False
