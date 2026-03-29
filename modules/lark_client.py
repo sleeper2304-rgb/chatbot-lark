@@ -110,6 +110,10 @@ class LarkClient:
         """Gửi tin nhắn text"""
         return self.send_message(receive_id, "text", {"text": text})
 
+    def send_interactive(self, receive_id: str, card: Dict) -> bool:
+        """Gửi interactive card"""
+        return self.send_message(receive_id, "interactive", card)
+
     def send_rich_text(self, receive_id: str, title: str, content: str) -> bool:
         """Gửi tin nhắn rich text (card)"""
         card_content = {

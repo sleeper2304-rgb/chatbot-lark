@@ -697,7 +697,7 @@ class ChatBot:
             return self._cmd_stats()
 
         elif cmd in ["report", "bao cao"]:
-            return self._cmd_report()
+            return self._cmd_report(user_id, chat_id)
 
         else:
             if args:
@@ -942,7 +942,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     def _cmd_checkout(self, user_id: str, chat_id: str) -> str:
@@ -996,7 +996,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     # ========== MEETING METHODS ==========
@@ -1058,7 +1058,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     def _cmd_standup(self, chat_id: str, user_id: str) -> str:
@@ -1100,7 +1100,7 @@ class ChatBot:
                 "elements": [{"tag": "plain_text", "content": f"🤖 {config.BOT_NAME}"}]
             }
         ])
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     # ========== NOTE METHODS ==========
@@ -1161,7 +1161,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     def _cmd_voting(self, args: str, user_id: str) -> str:
@@ -1218,7 +1218,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(chat_id, "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
     # ========== KEYWORD METHODS ==========
@@ -1344,7 +1344,7 @@ class ChatBot:
                 f"🟢 **Groq AI:** {'Online' if self.ai.is_available() else 'Offline'}\n"
                 f"🟢 **Lark API:** Connected")
 
-    def _cmd_report(self) -> str:
+    def _cmd_report(self, user_id: str, chat_id: str) -> str:
         """Tạo báo cáo"""
         uptime = datetime.now() - self.stats["start_time"]
         hours = int(uptime.total_seconds() // 3600)
@@ -1379,7 +1379,7 @@ class ChatBot:
                 }
             ]
         }
-        self.lark.send_message(event.get("chat_id", ""), "interactive", card)
+        self.lark.send_interactive(chat_id, card)
         return None
 
 
