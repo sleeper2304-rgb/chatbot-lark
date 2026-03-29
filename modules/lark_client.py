@@ -137,6 +137,291 @@ class LarkClient:
         }
         return self.send_message(receive_id, "interactive", card_content)
 
+    def send_interactive_card(self, receive_id: str, card: Dict) -> bool:
+        """Gửi interactive card tùy chỉnh"""
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_table_card(self, receive_id: str, title: str, headers: List[str], rows: List[List[str]], 
+                         buttons: List[Dict] = None, footer: str = None) -> bool:
+        """
+        Tạo card dạng bảng với buttons tùy chọn
+        
+        Args:
+            receive_id: ID người nhận
+            title: Tiêu đề card
+            headers: Danh sách tiêu đề cột
+            rows: Danh sách các dòng (mỗi dòng là list giá trị)
+            buttons: List buttons [{"text": "...", "type": "primary|default", "value": "..."}]
+            footer: Text footer
+        """
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": "blue"
+            },
+            "elements": [
+                {
+                    "tag": "table",
+                    "columns": [{"title": h} for h in headers],
+                    "data": {
+                        "rows": [{"cells": row} for row in rows]
+                    }
+                }
+            ]
+        }
+
+        if buttons:
+            btn_elements = []
+            for btn in buttons:
+                btn_elements.append({
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": btn.get("text", "Button")},
+                    "type": btn.get("type", "primary"),
+                    "value": {"action": btn.get("value", "")}
+                })
+            card["elements"].append({"tag": "div", "elements": btn_elements, "layout": "right"})
+
+        if footer:
+            card["elements"].append({"tag": "hr"})
+            card["elements"].append({
+                "tag": "note",
+                "elements": [{"tag": "plain_text", "content": footer}]
+            })
+
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_button_card(self, receive_id: str, title: str, description: str = None,
+                           buttons: List[Dict] = None, header_color: str = "blue") -> bool:
+        """
+        Tạo card với buttons có thể tương tác
+        
+        Args:
+            receive_id: ID người nhận
+            title: Tiêu đề
+            description: Mô tả (hỗ trợ markdown)
+            buttons: [{"text": "Text", "type": "primary|default", "value": "action_name"}]
+            header_color: blue, red, yellow, green, purple, orange, default
+        """
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": header_color
+            },
+            "elements": []
+        }
+
+        if description:
+            card["elements"].append({
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": description}
+            })
+
+        if buttons:
+            card["elements"].append({"tag": "hr"})
+            btn_elements = []
+            for btn in buttons:
+                btn_elements.append({
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": btn.get("text", "Button")},
+                    "type": btn.get("type", "primary"),
+                    "value": {"action": btn.get("value", "")}
+                })
+            card["elements"].append({"tag": "div", "elements": btn_elements, "layout": "right"})
+
+        card["elements"].append({
+            "tag": "note",
+            "elements": [{"tag": "plain_text", "content": f"🤖 {config.BOT_NAME}"}]
+        })
+
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_list_card(self, receive_id: str, title: str, items: List[Dict], 
+                        action_label: str = "Xem thêm") -> bool:
+        """
+        Tạo card dạng danh sách với nhiều items
+        
+        Args:
+            receive_id: ID người nhận
+            title: Tiêu đề
+            items: [{"title": "...", "description": "...", "value": "..."}]
+            action_label: Label cho button
+        """
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": "blue"
+            },
+            "elements": [
+                {
+                    "tag": "hr"
+                }
+            ]
+        }
+
+        for i, item in enumerate(items):
+            card["elements"].append({
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**{item.get('title', '')}**\n{item.get('description', '')}"
+                }
+            })
+            if i < len(items) - 1:
+                card["elements"].append({"tag": "hr"})
+
+        if action_label:
+            card["elements"].extend([
+                {"tag": "hr"},
+                {
+                    "tag": "div",
+                    "elements": [
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": action_label},
+                            "type": "primary",
+                            "value": {"action": "view_more"}
+                        }
+                    ],
+                    "layout": "right"
+                }
+            ])
+
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_form_card(self, receive_id: str, title: str, fields: List[Dict], 
+                        submit_label: str = "Gửi") -> bool:
+        """
+        Tạo card dạng form để thu thập thông tin
+        
+        Args:
+            receive_id: ID người nhận
+            title: Tiêu đề form
+            fields: [{"label": "...", "type": "text|select", "options": [...]}, ...]
+            submit_label: Label nút submit
+        """
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": "blue"
+            },
+            "elements": [
+                {"tag": "hr"}
+            ]
+        }
+
+        for field in fields:
+            card["elements"].append({
+                "tag": "div",
+                "text": {"tag": "lark_md", "content": f"**{field.get('label', '')}**"}
+            })
+            if field.get("type") == "select" and field.get("options"):
+                options_str = ", ".join([f"`{opt}`" for opt in field["options"]])
+                card["elements"].append({
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": f"*Các lựa chọn: {options_str}*"}
+                })
+            card["elements"].append({"tag": "hr"})
+
+        card["elements"].append({
+            "tag": "div",
+            "elements": [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": submit_label},
+                    "type": "primary",
+                    "value": {"action": "submit_form"}
+                }
+            ],
+            "layout": "right"
+        })
+
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_poll_card(self, receive_id: str, question: str, options: List[str],
+                        anonymous: bool = False) -> bool:
+        """
+        Tạo card khảo sát nhanh
+        
+        Args:
+            receive_id: ID người nhận
+            question: Câu hỏi khảo sát
+            options: Danh sách lựa chọn
+            anonymous: Khảo sát ẩn danh
+        """
+        options_md = "\n".join([f"{i+1}. {opt}" for i, opt in enumerate(options)])
+        
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": "📊 " + question},
+                "template": "purple"
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": options_md}
+                },
+                {"tag": "hr"},
+                {
+                    "tag": "note",
+                    "elements": [{"tag": "plain_text", "content": f"{'🔒 Ẩn danh' if anonymous else '👥 Công khai'}"}]
+                }
+            ]
+        }
+
+        return self.send_message(receive_id, "interactive", card)
+
+    def create_confirm_card(self, receive_id: str, title: str, description: str,
+                           confirm_text: str = "Xác nhận", cancel_text: str = "Hủy") -> bool:
+        """
+        Tạo card xác nhận có 2 nút
+        
+        Args:
+            receive_id: ID người nhận
+            title: Tiêu đề
+            description: Mô tả
+            confirm_text: Text nút xác nhận
+            cancel_text: Text nút hủy
+        """
+        card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": title},
+                "template": "orange"
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {"tag": "lark_md", "content": description}
+                },
+                {"tag": "hr"},
+                {
+                    "tag": "div",
+                    "elements": [
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": cancel_text},
+                            "type": "default",
+                            "value": {"action": "cancel"}
+                        },
+                        {
+                            "tag": "button",
+                            "text": {"tag": "plain_text", "content": confirm_text},
+                            "type": "primary",
+                            "value": {"action": "confirm"}
+                        }
+                    ],
+                    "layout": "right"
+                }
+            ]
+        }
+
+        return self.send_message(receive_id, "interactive", card)
+
     def send_image(self, receive_id: str, image_key: str) -> bool:
         """Gửi hình ảnh"""
         return self.send_message(receive_id, "image", {"image_key": image_key})

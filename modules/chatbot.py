@@ -31,6 +31,11 @@ class ChatBot:
         "clear": "Xóa lịch sử hội thoại",
         "schedule": "Xem lịch làm việc",
         "report": "Tạo báo cáo",
+        "table": "Tạo bảng thông tin",
+        "poll": "Tạo khảo sát nhanh",
+        "form": "Tạo form thu thập thông tin",
+        "confirm": "Xác nhận hành động",
+        "menu": "Hiển thị menu tương tác",
     }
 
     def __init__(self):
@@ -138,6 +143,21 @@ class ChatBot:
 
         elif cmd in ["report", "báo cáo"]:
             return self._cmd_report(user_id)
+
+        elif cmd in ["table", "bang", "bảng"]:
+            return self._cmd_table(args, chat_id)
+
+        elif cmd in ["poll", "khao sat", "khảo sát", "survey"]:
+            return self._cmd_poll(args, chat_id)
+
+        elif cmd in ["form"]:
+            return self._cmd_form(args, chat_id)
+
+        elif cmd in ["confirm", "xac nhan", "xác nhận"]:
+            return self._cmd_confirm(args, chat_id)
+
+        elif cmd in ["menu"]:
+            return self._cmd_menu(chat_id)
 
         else:
             # Không phải command -> gửi cho AI xử lý
@@ -285,6 +305,115 @@ class ChatBot:
         report_text += f"• Lark API: 🟢 Connected"
 
         return report_text
+
+    def _cmd_table(self, args: str, chat_id: str) -> str:
+        """Tạo bảng thông tin"""
+        if not args:
+            return ("📊 **Tạo Bảng Thông Tin**\n\n"
+                   "Cú pháp: `/table [tiêu đề] | [cột 1], [cột 2]... | [dòng 1 cột 1], [dòng 1 cột 2]... | [dòng 2 cột 1], [dòng 2 cột 2]...`\n\n"
+                   "Ví dụ:\n"
+                   "`/table Danh sách Task | Task, Trạng thái, Deadline | Thiết kế UI, Đang làm, 15/04 | Code API, Chưa làm, 20/04`")
+
+        parts = [p.strip() for p in args.split("|")]
+        if len(parts) < 3:
+            return "❌ Cú pháp không đúng. Cần: `/table [tiêu đề] | [cột 1], [cột 2] | [dòng 1 cột 1], [dòng 1 cột 2] | ...`"
+
+        title = parts[0]
+        headers = [h.strip() for h in parts[1].split(",")]
+        rows = []
+        for p in parts[2:]:
+            rows.append([cell.strip() for cell in p.split(",")])
+
+        self.lark.create_table_card(
+            receive_id=chat_id,
+            title=title,
+            headers=headers,
+            rows=rows,
+            footer=f"🤖 {config.BOT_NAME} • {datetime.now().strftime('%d/%m/%Y')}"
+        )
+        return None
+
+    def _cmd_poll(self, args: str, chat_id: str) -> str:
+        """Tạo khảo sát nhanh"""
+        if not args:
+            return ("📊 **Tạo Khảo Sát Nhanh**\n\n"
+                   "Cú pháp: `/poll [câu hỏi] | [lựa chọn 1] | [lựa chọn 2] | [lựa chọn 3]...`\n\n"
+                   "Ví dụ:\n"
+                   "`/poll Bạn thích món nào nhất? | Pizza | Burger | Sushi`")
+
+        parts = [p.strip() for p in args.split("|")]
+        if len(parts) < 3:
+            return "❌ Cần ít nhất 1 câu hỏi và 2 lựa chọn."
+
+        question = parts[0]
+        options = parts[1:]
+
+        self.lark.create_poll_card(
+            receive_id=chat_id,
+            question=question,
+            options=options
+        )
+        return None
+
+    def _cmd_form(self, args: str, chat_id: str) -> str:
+        """Tạo form thu thập thông tin"""
+        if not args:
+            return ("📝 **Tạo Form Thu Thập Thông Tin**\n\n"
+                   "Cú pháp: `/form [tiêu đề] | [câu hỏi 1] | [câu hỏi 2]...`\n\n"
+                   "Ví dụ:\n"
+                   "`/form Khảo sát ý kiến | Bạn tên gì? | Bạn bao nhiêu tuổi?`")
+
+        parts = [p.strip() for p in args.split("|")]
+        title = parts[0] if parts else "Form thông tin"
+        fields = [{"label": f, "type": "text"} for f in parts[1:]]
+
+        if not fields:
+            return "❌ Cần ít nhất 1 câu hỏi."
+
+        self.lark.create_form_card(
+            receive_id=chat_id,
+            title=title,
+            fields=fields
+        )
+        return None
+
+    def _cmd_confirm(self, args: str, chat_id: str) -> str:
+        """Tạo card xác nhận"""
+        if not args:
+            return ("❓ **Xác Nhận Hành Động**\n\n"
+                   "Cú pháp: `/confirm [tiêu đề] | [mô tả]`\n\n"
+                   "Ví dụ:\n"
+                   "`/confirm Xác nhận xóa? | Bạn có chắc muốn xóa task này không?`")
+
+        parts = [p.strip() for p in args.split("|", 1)]
+        title = parts[0]
+        description = parts[1] if len(parts) > 1 else ""
+
+        self.lark.create_confirm_card(
+            receive_id=chat_id,
+            title=title,
+            description=description
+        )
+        return None
+
+    def _cmd_menu(self, chat_id: str) -> str:
+        """Hiển thị menu tương tác"""
+        items = [
+            {"title": "🤖 Chat với AI", "description": "Trò chuyện với AI Assistant", "value": "chat"},
+            {"title": "📊 Tạo Bảng", "description": "Tạo bảng thông tin nhanh", "value": "table"},
+            {"title": "📝 Tạo Form", "description": "Thu thập thông tin từ nhóm", "value": "form"},
+            {"title": "🗳️ Tạo Khảo Sát", "description": "Tạo poll/bình chọn", "value": "poll"},
+            {"title": "📈 Xem Thống Kê", "description": "Xem hoạt động của bot", "value": "stats"},
+            {"title": "🧹 Xóa Lịch Sử", "description": "Bắt đầu cuộc trò chuyện mới", "value": "clear"},
+        ]
+
+        self.lark.create_list_card(
+            receive_id=chat_id,
+            title=f"📋 {config.BOT_NAME} - Menu Chính",
+            items=items,
+            action_label="Xem thêm lệnh"
+        )
+        return None
 
 
 # Singleton instance
